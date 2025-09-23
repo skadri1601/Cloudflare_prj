@@ -1,0 +1,29 @@
+{
+  "name": "cf-ai-travel-planner",
+  "version": "1.0.0",
+  "description": "AI-powered travel agent using Cloudflare Workers, Durable Objects, and Workers AI",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest",
+    "preview": "wrangler pages dev src/ui --compatibility-date=2024-10-01"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "ai",
+    "travel",
+    "chatbot",
+    "durable-objects"
+  ],
+  "author": "Saad",
+  "license": "MIT",
+  "devDependencies": {
+    "vitest": "^1.0.0",
+    "wrangler": "^3.0.0"
+  },
+  "dependencies": {
+    "@cloudflare/workers-types": "^4.0.0"
+  }
+}
