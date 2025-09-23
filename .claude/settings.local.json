@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:agents.cloudflare.com)",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "WebSearch",
+      "WebFetch(domain:blog.cloudflare.com)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

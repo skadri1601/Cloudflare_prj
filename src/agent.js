@@ -264,6 +264,7 @@ Instructions:
       return response.response;
 
     } catch (error) {
+      // Handle itinerary generation errors gracefully
       console.error('Itinerary generation error:', error);
       return "I'm sorry, I couldn't generate an itinerary at the moment. Please try again.";
     }

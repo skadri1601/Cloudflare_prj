@@ -67,4 +67,3 @@ tmp/
 temp/
 
 # Local development files
-.claude/settings.local.json
