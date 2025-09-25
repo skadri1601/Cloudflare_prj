@@ -1,23 +1,32 @@
-# 🌍 AI Travel Planner Configuration
-# Customize the name below to match your preference
-name = "cf-ai-travel-planner"
-main = "src/index.js"
+# 🌍 Autonomous AI Travel Planning Agent Configuration
+# Built with Cloudflare Agents SDK for autonomous task execution
+name = "cf-ai-travel-planner-agent"
+main = "src/index.ts"
 compatibility_date = "2024-10-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Workers AI binding (enables LLaMA 3.3 access)
+# Workers AI binding (enables LLaMA 3.1 70B access)
 [ai]
 binding = "AI"
+remote = true
 
-# Durable Objects for user memory
+# Enable Durable Objects for agent functionality
+[[durable_objects.bindings]]
+name = "TravelPlanningAgent"
+class_name = "TravelPlanningAgent"
+
 [[durable_objects.bindings]]
 name = "TRAVEL_MEMORY"
 class_name = "TravelMemory"
 
-# Durable Objects migration (SQLite for free plan)
+# Durable Objects migration with SQLite support
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["TravelMemory"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["TravelPlanningAgent"]
 
 # Workflow Engine binding for orchestration (preview feature)
 # Uncomment when Workflows is available in your account
