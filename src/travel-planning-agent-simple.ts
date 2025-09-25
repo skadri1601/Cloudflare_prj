@@ -246,15 +246,36 @@ export class TravelPlanningAgent extends Agent {
       const durationMatch = message.match(/(\d+)\s*(day|days)/i);
       const duration = durationMatch ? parseInt(durationMatch[1]) : 3;
 
-      // Extract destination from message
-      const destinations = ['Tokyo', 'Paris', 'London', 'New York', 'Madisonville', 'Rome', 'Sydney', 'Barcelona', 'Amsterdam', 'Russia', 'Moscow', 'St. Petersburg'];
-      let destination = 'Paris'; // default
+      // Extract destination from message using flexible patterns
+      let destination = null;
 
-      for (const dest of destinations) {
-        if (message.toLowerCase().includes(dest.toLowerCase())) {
-          destination = dest;
-          break;
+      // Try multiple patterns to extract destination
+      const patterns = [
+        /(?:trip to|visit|travel to|go to|plan.*?to|vacation to|holiday to|journey to|fly to|drive to)\s+([A-Za-z\s,'-]+?)(?:\s+for|\s+in|\s*,|\s*\.|\s*\?|\s*!|$)/i,
+        /(?:in|at|around)\s+([A-Za-z\s,'-]+?)(?:\s+for|\s+in|\s*,|\s*\.|\s*\?|\s*!|$)/i,
+        /([A-Za-z\s,'-]+?)\s+(?:for\s+\d+|trip|vacation|holiday|travel|visit)/i
+      ];
+
+      for (const pattern of patterns) {
+        const match = message.match(pattern);
+        if (match && match[1]) {
+          const extracted = match[1].trim();
+          // Clean up common words that might be captured
+          const cleanDest = extracted
+            .replace(/^(a|an|the|my|our|this|that)\s+/i, '')
+            .replace(/\s+(trip|vacation|holiday|travel|visit|journey)$/i, '')
+            .trim();
+
+          if (cleanDest.length > 2 && cleanDest.length < 50) {
+            destination = cleanDest;
+            break;
+          }
         }
+      }
+
+      // If still no destination found, use a fallback
+      if (!destination) {
+        destination = 'your desired destination';
       }
 
       console.log(`🎯 Parsed: ${destination} for ${duration} days`);
@@ -424,32 +445,116 @@ export class TravelPlanningAgent extends Agent {
 
   private async checkWeather(destination: string): Promise<any> {
     console.log('🌤️ Checking weather for:', destination);
-    return {
-      type: 'weather',
-      destination,
-      forecast: `Weather forecast for ${destination}: Expect mild temperatures with partly cloudy skies. Great for outdoor activities and sightseeing. Temperature range 22-28°C.`,
-      recommendation: `Weather conditions are favorable for travel to ${destination}`
-    };
+
+    try {
+      // First try to get weather data from API if available
+      let weatherData = null;
+
+      try {
+        // Check if WEATHER_API_KEY is available as a secret
+        if (this.env.WEATHER_API_KEY) {
+          const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${destination}&appid=${this.env.WEATHER_API_KEY}&units=metric`);
+          if (response.ok) {
+            weatherData = await response.json();
+          }
+        }
+      } catch (error) {
+        console.log('Weather API not available, using AI generation');
+      }
+
+      // Use AI to generate comprehensive weather information
+      const weatherPrompt = weatherData
+        ? `Based on this weather data for ${destination}: ${JSON.stringify(weatherData)}, provide a travel weather summary with current conditions and recommendations.`
+        : `Provide a concise weather forecast for ${destination} including current season conditions, temperature range, and travel tips.`;
+
+      const response = await this.env.AI.run('@cf/meta/llama-3.1-70b-instruct', {
+        messages: [
+          { role: 'system', content: 'You are a weather expert providing detailed, realistic weather forecasts for travelers. Be specific about conditions and give practical travel advice.' },
+          { role: 'user', content: weatherPrompt }
+        ]
+      });
+
+      return {
+        type: 'weather',
+        destination,
+        forecast: response.response || `Weather forecast for ${destination}: Current conditions and 7-day outlook with travel recommendations.`,
+        recommendation: `Weather analysis completed for ${destination}`
+      };
+    } catch (error) {
+      console.error('Weather check failed:', error);
+      return {
+        type: 'weather',
+        destination,
+        forecast: `Weather information temporarily unavailable for ${destination}. Please check local weather sources for current conditions.`,
+        recommendation: 'Weather data retrieval encountered an issue'
+      };
+    }
   }
 
   private async searchEvents(destination: string): Promise<any> {
     console.log('🎭 Searching events for:', destination);
-    return {
-      type: 'events',
-      destination,
-      events: `Top events and activities in ${destination}: Local festivals, art galleries, museums, guided city tours, cultural performances, and seasonal attractions. Check local event calendars for specific dates.`,
-      recommendation: `Exciting events and activities found for ${destination}`
-    };
+
+    try {
+      // Use AI to generate live, current events and activities
+      const currentDate = new Date().toISOString().split('T')[0];
+      const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+      const currentYear = new Date().getFullYear();
+
+      const eventsPrompt = `Provide current events and activities for ${destination} in ${currentMonth} ${currentYear}. Include festivals, museums, tours, seasonal activities, and local attractions. Be specific and practical for travelers.`;
+
+      const response = await this.env.AI.run('@cf/meta/llama-3.1-70b-instruct', {
+        messages: [
+          { role: 'system', content: 'You are a knowledgeable local guide providing current, detailed information about events and activities. Include specific venue names, seasonal considerations, and practical travel advice.' },
+          { role: 'user', content: eventsPrompt }
+        ]
+      });
+
+      return {
+        type: 'events',
+        destination,
+        events: response.response || `Current events and activities in ${destination} for ${currentMonth} ${currentYear}.`,
+        recommendation: `Live events and activities research completed for ${destination}`
+      };
+    } catch (error) {
+      console.error('Events search failed:', error);
+      return {
+        type: 'events',
+        destination,
+        events: `Events information temporarily unavailable for ${destination}. Please check local event listings and tourism websites.`,
+        recommendation: 'Events data retrieval encountered an issue'
+      };
+    }
   }
 
   private async searchAccommodations(destination: string): Promise<any> {
     console.log('🏨 Searching accommodations for:', destination);
-    return {
-      type: 'accommodation',
-      destination,
-      options: `Accommodation options in ${destination}: Budget hostels and guesthouses ($20-40/night), mid-range hotels with good amenities ($50-120/night), luxury hotels and resorts ($150+/night). Book in advance for better rates.`,
-      recommendation: `Various accommodation options found for ${destination}`
-    };
+
+    try {
+      // Use AI to generate current accommodation recommendations
+      const accommodationPrompt = `Provide accommodation recommendations for ${destination} including budget ($20-60/night), mid-range ($60-150/night), and luxury ($150+/night) options. Include specific hotel names, best areas to stay, and booking tips.`;
+
+      const response = await this.env.AI.run('@cf/meta/llama-3.1-70b-instruct', {
+        messages: [
+          { role: 'system', content: 'You are a travel accommodation specialist with extensive knowledge of hotels, hostels, and unique stays worldwide. Provide specific, actionable recommendations.' },
+          { role: 'user', content: accommodationPrompt }
+        ]
+      });
+
+      return {
+        type: 'accommodation',
+        destination,
+        options: response.response || `Accommodation recommendations for ${destination} across all budget ranges.`,
+        recommendation: `Live accommodation search completed for ${destination}`
+      };
+    } catch (error) {
+      console.error('Accommodation search failed:', error);
+      return {
+        type: 'accommodation',
+        destination,
+        options: `Accommodation information temporarily unavailable for ${destination}. Please check booking platforms like Booking.com, Expedia, or Airbnb.`,
+        recommendation: 'Accommodation data retrieval encountered an issue'
+      };
+    }
   }
 
   private async generateItinerary(plan: TravelPlan): Promise<any> {
@@ -474,13 +579,58 @@ export class TravelPlanningAgent extends Agent {
 
       console.log('📋 Generating itinerary for:', plan.destination, `(${plan.duration} days)`);
 
-      const itinerary = this.generateDetailedItinerary(plan.destination, plan.duration);
+      // Use AI to generate a comprehensive, personalized itinerary based on research data
+      const currentDate = new Date().toISOString().split('T')[0];
+      const currentSeason = this.getCurrentSeason();
+
+      // Generate itinerary in chunks to avoid truncation
+      let itineraryText = '';
+      const maxDaysPerChunk = 2; // Generate 2 days at a time to avoid token limits
+
+      for (let startDay = 1; startDay <= plan.duration; startDay += maxDaysPerChunk) {
+        const endDay = Math.min(startDay + maxDaysPerChunk - 1, plan.duration);
+        const daysInChunk = endDay - startDay + 1;
+
+        const chunkPrompt = `Create days ${startDay} to ${endDay} of a ${plan.duration}-day itinerary for ${plan.destination}.
+
+Format each day as:
+**Day X: Theme**
+• Morning: Activity
+• Lunch: Food/restaurant
+• Afternoon: Activity
+• Evening: Activity
+
+Generate Day ${startDay}${daysInChunk > 1 ? ` and Day ${endDay}` : ''} only. Be specific to ${plan.destination}.`;
+
+        try {
+          const chunkResponse = await this.env.AI.run('@cf/meta/llama-3.1-70b-instruct', {
+            messages: [
+              { role: 'system', content: 'Generate only the requested days. Be concise and specific.' },
+              { role: 'user', content: chunkPrompt }
+            ]
+          });
+
+          if (chunkResponse.response) {
+            itineraryText += chunkResponse.response + '\n\n';
+          }
+        } catch (error) {
+          console.log(`Error generating days ${startDay}-${endDay}, using fallback`);
+          itineraryText += this.generateFallbackDays(plan.destination, endDay, startDay);
+        }
+      }
+
+      // Final check - ensure all days are present
+      const dayCount = (itineraryText.match(/\*\*Day \d+:/g) || []).length;
+      if (dayCount < plan.duration) {
+        console.log(`⚠️ Still missing days. Got ${dayCount}, expected ${plan.duration}`);
+        itineraryText += this.generateFallbackDays(plan.destination, plan.duration, dayCount + 1);
+      }
 
       return {
         type: 'itinerary',
         destination: plan.destination,
         duration: plan.duration,
-        itinerary,
+        itinerary: itineraryText || this.generateDetailedItinerary(plan.destination, plan.duration),
         recommendation: `Complete ${plan.duration}-day itinerary created for ${plan.destination}`
       };
     } catch (error) {
@@ -515,6 +665,28 @@ export class TravelPlanningAgent extends Agent {
         };
       })
     };
+  }
+
+  private getCurrentSeason(): string {
+    const month = new Date().getMonth() + 1; // 1-12
+    if (month >= 12 || month <= 2) return 'Winter';
+    if (month >= 3 && month <= 5) return 'Spring';
+    if (month >= 6 && month <= 8) return 'Summer';
+    return 'Fall';
+  }
+
+  private generateFallbackDays(destination: string, totalDays: number, startDay: number): string {
+    let fallbackDays = '\n\n';
+
+    for (let day = startDay; day <= totalDays; day++) {
+      fallbackDays += `**Day ${day}: Explore ${destination}**\n`;
+      fallbackDays += `• Morning: Visit local attractions and landmarks\n`;
+      fallbackDays += `• Lunch: Try authentic ${destination} cuisine\n`;
+      fallbackDays += `• Afternoon: Cultural sites and museums\n`;
+      fallbackDays += `• Evening: Local dining and entertainment\n\n`;
+    }
+
+    return fallbackDays;
   }
 
   private generateDetailedItinerary(destination: string, duration: number): string {

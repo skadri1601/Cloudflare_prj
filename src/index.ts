@@ -254,7 +254,7 @@ function serveHTML(): Response {
 
     function pollForPlanUpdates(planId, messages) {
         var pollCount = 0;
-        var maxPolls = 15; // Poll for up to 30 seconds (2 second intervals)
+        var maxPolls = 30; // Poll for up to 60 seconds (2 second intervals)
 
         var pollInterval = setInterval(function() {
             pollCount++;
